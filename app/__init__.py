@@ -5,7 +5,7 @@ from flask_login import login_required, logout_user, current_user, login_user
 from sqlalchemy import desc
 from sqlalchemy.orm.exc import NoResultFound
 from app.config import Config
-from app.models import db, login_manager, User, Token, Module, Profile, Order, Series, ModuleSeries, Image, ModuleReview
+from app.models import db, login_manager, User, Token, Module, Profile, Order, Enrolled, Series, ModuleSeries, Image, ModuleReview
 from app.oauth import blueprint
 from app.cli import create_db
 from data import rawdata
@@ -126,20 +126,20 @@ def modules():
     return jsonify(resp)
 
 
-@app.route('/create_a_json_object')
-def create_moduless():
-    modules = Module.query.all()
-    resp = [{
-        'title': i.title,
-        'description': i.description,
-        'price': i.price,
-        'mentor_id': i.mentor_id,
-        'end_date': i.end_date,
-        'start_date': i.start_date,
-        'default_img': i.default_img,
-        'syllabus': i.syllabus
-    } for i in modules]
-    return jsonify(resp)
+# @app.route('/create_a_json_object')
+# def create_moduless():
+#     modules = Module.query.all()
+#     resp = [{
+#         'title': i.title,
+#         'description': i.description,
+#         'price': i.price,
+#         'mentor_id': i.mentor_id,
+#         'end_date': i.end_date,
+#         'start_date': i.start_date,
+#         'default_img': i.default_img,
+#         'syllabus': i.syllabus
+#     } for i in modules]
+#     return jsonify(resp)
 
 
 @app.route('/addsomething')
@@ -194,6 +194,7 @@ def create_module():
 def single_module(id):
     # module_data = request.get_json()
     module=Module.query.filter_by(id=id).first()
+    is_enrolled = True if Enrolled.query.filter(Enrolled.user_id==current_user.id, Enrolled.module_id == id).all() else False
     if module:
         resp={
             "status": 200,
@@ -206,7 +207,9 @@ def single_module(id):
                        'mentor_id': module.users.id,
                        'img': module.default_img,
                        'price': module.price,
-                       "syllabus": module.syllabus}
+                       "syllabus": module.syllabus,
+                       "enrolled": is_enrolled
+                       }
         }
 
     else:
@@ -341,15 +344,69 @@ def asdad():
         db.session.add(reviews)
         db.session.commit()
     
-    return 'reviews addedddd'
+    return 'reviews added'
 
 
-    # for data in datas:
-    #     new_user = User(email=data['email'],
-    #                     name=data['first_name'])
-    #     new_user.set_password(data['password'])
-    #     db.session.add(new_user)
-    #     db.session.commit()
 
-    #     db.session.add(new_profile)
-    #     db.session.commit()
+@app.route('/mentors', methods=['GET'])
+def mentors():
+    a = User.query.filter_by(role="mentor").all()
+    b = [ i.profile for i in a]
+    resp = {
+        "status": 200,
+        'mentors': [{'id': i.id,
+                    'first_name': i.first_name,
+                    'last_name': i.last_name,
+                    'img': i.img,
+                    'about': i.about,
+                    'email': i.email,
+                    'role': i.users.role,
+                    } for i in b]
+    }
+
+    return jsonify(resp)
+
+
+
+@app.route('/enroll/<id>', methods=['GET', 'POST'])
+@login_required
+def enroll(id):
+    
+    check_enrolled = Enrolled.query.filter_by(user_id=current_user.id).first()
+    if check_enrolled:
+        db.session.delete(check_enrolled)
+        db.session.commit()
+
+        return jsonify({
+            "status": 200,
+            "message": "Unenrolled"
+        })
+    enolled = Enrolled(user_id=current_user.id,
+                    module_id=id)
+    db.session.add(enolled)
+    db.session.commit()
+
+
+    return jsonify({
+        "status": 200,
+        "message": "Unenrolled"
+        })
+
+@app.route('/enrolled')
+@login_required
+def enrolled():
+    modules = Module.query.filter_by(enrolled=current_user.id).all()
+    # modules = Module.query.order_by(desc(Module.start_date)).all()
+    resp = {
+        "status": 200,
+        'modules': [{'id': i.id,
+                     'title': i.title,
+                     'description': i.description,
+                     'start_date': i.start_date,
+                     'end_date': i.end_date,
+                     'mentor': i.users.name,
+                     'mentor_id': i.users.id,
+                     'img': i.default_img,
+                     } for i in modules]
+    }
+    return jsonify(resp)

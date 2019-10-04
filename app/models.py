@@ -39,6 +39,9 @@ class Profile(db.Model):
     email = db.Column(db.String(256))
     dob = db.Column(db.DateTime)
 
+    def role(self):
+        return self.users.role
+
 
 class OAuth(OAuthConsumerMixin, db.Model):
     provider_user_id = db.Column(db.String(256), unique=True, nullable=False)
@@ -89,6 +92,9 @@ class Module(db.Model):
     images = db.relationship("Image", backref="module", lazy=True)
     default_img = db.Column(db.String(1000))
 
+    def enrolled(self):
+        return self.enrolled.user_id
+
 
 class Series(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -131,6 +137,9 @@ class ModuleReview(db.Model):
 
     def student_name(self):
         return self.user.name
+
+    def mentor_name(self):
+        return self.module.users.mentor_for
 
 
 login_manager = LoginManager()
